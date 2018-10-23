@@ -6,7 +6,9 @@ defmodule ChordProtocol.Application do
   use Application
 
   def start(_type, _args) do
-    System.argv() |> parse_args |> process
+    #IO.inspect(System.argv())
+    #System.argv() |> parse_args |> process
+    ["20","2"] |> parse_args |> process
   end
 
   @doc """

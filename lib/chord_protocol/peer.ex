@@ -104,7 +104,7 @@ defmodule ChordProtocol.Peer do
   end
 
   def handle_info(:check_finger,{finger, identifier, pre}) do
-    #{_start,peer} = List.first(finger)
+    {_start,peer} = List.first(finger)
     #IO.puts("Finger TABLE")
     #IO.inspect({identifier,pre,peer})
     #IO.inspect(Enum.take(finger,1))
@@ -131,27 +131,27 @@ defmodule ChordProtocol.Peer do
       suc = if ndash==identifier do
         suc
       else
-        GenServer.call(globalcall(ndash),:get_suc)
+        GenServer.call(globalcall(ndash),{:find_suc,id},10000)
       end
       suc
     end
     { :reply, successor,{finger,identifier,pre} }
   end
 
-  def handle_call({:find_key,id,hop,k},_from,{finger,identifier,pre}) do
+  def handle_call({:find_key,id,hop},_from,{finger,identifier,pre}) do
     #IO.puts("test1")
     #IO.inspect(List.first(finger))
     {_start,suc} = List.first(finger)
     {successor,h} = if betweeno(id,identifier,suc) do
-      {suc,hop+1}
+      {suc,hop}
     else
       ndash=closest_prec_node(id,{finger,identifier,pre})
       {suc,hop} = if ndash==identifier do
-        {suc,hop+1}
+        {suc,hop}
         else
-          {GenServer.call(globalcall(ndash),:get_suc),hop+1}
+           GenServer.call(globalcall(ndash),{:find_key,id,hop+1})
         end
-      {suc,hop+1}
+      {suc,hop}
     end
       GenServer.cast(NetworkSimulator,{:save_hops,{id,h}})
       { :reply, {successor,h},{finger,identifier,pre} }

@@ -9,7 +9,7 @@ defmodule ChordProtocol.NetworkSimulator do
   end
 
   def init(args) do
-    Process.send_after(self(), :kickoff, 0)
+    Process.send_after(self(), :kickoff, 10000)
     {:ok, args}
   end
 
@@ -40,7 +40,7 @@ defmodule ChordProtocol.NetworkSimulator do
     msg = "message" <> Integer.to_string(x)
     <<message::big-unsigned-integer-size(160)>> = :crypto.hash(:sha,msg)
     nodes |> Enum.each(fn c ->
-      GenServer.call({:global,c},{:find_key,message,0,non})
+      GenServer.call({:global,c},{:find_key,message,0})
       #IO.inspect(c)
     end)
     {:noreply, {non,nom,noh,dcount,nodes}}
@@ -63,7 +63,7 @@ defmodule ChordProtocol.NetworkSimulator do
     if(dcount==nom) do
       IO.puts("Average Hop Count")
       IO.inspect(noh/nom)
-      System.halt(0)
+      #System.halt(0)
     end
     {:noreply, {non,nom,noh,dcount,nodes}}
   end
