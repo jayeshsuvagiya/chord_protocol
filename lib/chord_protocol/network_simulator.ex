@@ -23,7 +23,7 @@ defmodule ChordProtocol.NetworkSimulator do
     #Process.send_after(self(),{:start_node,non-2},5000)
     GenServer.cast({:global,peer},{:join_network,nil})
     Process.send_after(self(),{:join_node,non-2},2000)
-    Process.send_after(self(),{:start_query},1000*non)
+    Process.send_after(self(),{:start_query},5000*non)
     #IO.inspect(nodes)
     noh = 0
     dcount = 0
@@ -75,8 +75,8 @@ defmodule ChordProtocol.NetworkSimulator do
   def handle_cast({:save_hops,{m,s,f,hops}},{non,nom,noh,dcount,nodes}) do
     noh = noh+hops
     dcount = dcount+1
-    #IO.puts("save_hop")
-    #IO.inspect({m,s,f,hops})
+    IO.puts("save_hop")
+    IO.inspect({m,s,f,hops})
     if(dcount==nom*non) do
       IO.puts("Average Hop Count")
       IO.inspect(noh/dcount)

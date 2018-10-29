@@ -8,7 +8,7 @@ defmodule ChordProtocol.Application do
   def start(_type, _args) do
     #IO.inspect(System.argv())
     #System.argv() |> parse_args |> process
-    ["50","2"] |> parse_args |> process
+    ["100","25"] |> parse_args |> process
   end
 
   @doc """
