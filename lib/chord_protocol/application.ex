@@ -7,8 +7,8 @@ defmodule ChordProtocol.Application do
 
   def start(_type, _args) do
     #IO.inspect(System.argv())
-    #System.argv() |> parse_args |> process
-    ["100","25"] |> parse_args |> process
+    System.argv() |> parse_args |> process
+    #["100","25"] |> parse_args |> process
   end
 
   @doc """
@@ -40,6 +40,7 @@ defmodule ChordProtocol.Application do
   def process({non, nom}) do
     # List all child processes to be supervised
     children = [
+    {ChordProtocol.FailureSimulator,non},
     {ChordProtocol.NetworkSimulator,{non,nom}}
     ]
     # See https://hexdocs.pm/elixir/Supervisor.html

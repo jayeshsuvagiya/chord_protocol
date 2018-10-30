@@ -16,7 +16,7 @@ defmodule ChordProtocol.Peer do
     identifier
   end
 
-  def init({identifier,dnode}) do
+  def init({identifier,_dnode}) do
     #initialise finger start values (n+2^i)mod(2^160)
     finger = 0..159 |> Enum.map(fn x ->
       start = rem(trunc(identifier+ trunc(:math.pow(2,x))),trunc(:math.pow(2,160)))
@@ -35,14 +35,14 @@ defmodule ChordProtocol.Peer do
     #IO.inspect(identifier)
     {p,newfinger} = if (dnode) do
       [{fstart,_} | rest] = finger
-     # IO.puts("arb_node")
+      # IO.puts("arb_node")
       #IO.inspect(dnode)
       peer = GenServer.call(globalcall(dnode),{:find_suc,fstart},@timeo)
       pre =  GenServer.call(globalcall(peer),:get_pre,@timeo)
       GenServer.call(globalcall(peer),{:set_pre,identifier})
-      [{fstart,peer}|rest] |> Enum.scan(fn (a,b) ->
-        {cstart,cpeer} = a
-        {pstart,ppeer} = b
+      nf=[{fstart,peer}|rest] |> Enum.scan(fn (a,b) ->
+        {cstart,_cpeer} = a
+        {_pstart,ppeer} = b
         cpeer = if (between(cstart,identifier,ppeer)) do
             ppeer
           else
@@ -56,7 +56,7 @@ defmodule ChordProtocol.Peer do
           GenServer.cast(globalcall(p),{:update_finger,identifier,x})
         end
       end)
-      {pre,[{fstart,peer}|rest]}
+      {pre,nf}
     else
       rest = finger |> Enum.map(fn {start,_} ->
         {start,identifier}
@@ -265,6 +265,38 @@ defmodule ChordProtocol.Peer do
     { :noreply,{finger,identifier,pre} }
   end
 
+  def handle_cast({:join_net,p,s,nodes,_i},{finger,identifier,_pre}) do
+
+      [{fstart,_} | rest] = finger
+
+      peer = s
+      npre =  p
+
+      nf=[{fstart,peer}|rest] |> Enum.scan(fn (a,b) ->
+        {cstart,_cpeer} = a
+        {_pstart,ppeer} = b
+        cpeer = if (between(cstart,identifier,ppeer)) do
+          ppeer
+        else
+          #GenServer.call(globalcall(dnode),{:find_suc,cstart},@timeo)
+          find_close_node(cstart,nodes)
+        end
+        {cstart,cpeer}
+      end)
+      #1..159 |>  Enum.each(fn x ->
+      #  p=find_predecessor(mod(trunc(identifier-trunc(:math.pow(2,x))),trunc(:math.pow(2,160))),{finger,identifier,pre})
+      #  if identifier != p do
+      #    GenServer.cast(globalcall(p),{:update_finger,identifier,x})
+      #  end
+      #end)
+
+      #IO.inspect( IO.inspect(Enum.take(nf,-3)))
+
+    stabilize(60000*Enum.random(1..5))
+    fix_fingers(159,60000)
+    GenServer.cast(FailureSimulator,:done)
+    { :noreply,{nf,identifier,npre} }
+  end
   #def handle_cast({:find_key,message},{finger,identifier,pre}) do
    # Process.send_after({})
    # { :noreply,{finger,identifier,pre} }
@@ -310,6 +342,14 @@ defmodule ChordProtocol.Peer do
       else
       d
       end
+  end
+
+
+  def find_close_node(id,nodes) do
+    [_m,n]=Enum.chunk_every(nodes, 2, 1, :discard) |> Enum.find([nil,List.first(nodes)],fn [a,b] ->
+    between(id,a,b)
+    end)
+    n
   end
 
 

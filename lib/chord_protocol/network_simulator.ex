@@ -21,9 +21,10 @@ defmodule ChordProtocol.NetworkSimulator do
     nodes = List.insert_at([],0,peer)
     nodes = start_node(non-2,nodes)
     #Process.send_after(self(),{:start_node,non-2},5000)
-    GenServer.cast({:global,peer},{:join_network,nil})
-    Process.send_after(self(),{:join_node,non-2},2000)
-    Process.send_after(self(),{:start_query},5000*non)
+    GenServer.cast({:global,Enum.at(nodes,0)},{:join_net,List.last(nodes),Enum.at(nodes,1),nodes,0})
+    IO.puts("Building Network...Please Wait")
+    Process.send_after(self(),{:join_node,0},2000)
+    #Process.send_after(self(),{:start_query},2500+non)
     #IO.inspect(nodes)
     noh = 0
     dcount = 0
@@ -31,9 +32,9 @@ defmodule ChordProtocol.NetworkSimulator do
   end
 
   def handle_info({:start_query},{non,nom,noh,dcount,nodes}) do
-    IO.inspect(length(nodes))
+    #IO.inspect(length(nodes))
     1..nom |> Enum.each(fn x ->
-      Process.send_after(self(),{:start_msg,x},5*nom*non)
+      Process.send_after(self(),{:start_msg,x},5000)
     end)
     {:noreply, {non,nom,noh,dcount,nodes}}
   end
@@ -64,26 +65,37 @@ defmodule ChordProtocol.NetworkSimulator do
   end
 
   def handle_info({:join_node,n},{non,nom,noh,dcount,nodes}) do
-    [a,b]=Enum.slice(nodes,n,2)
-    GenServer.cast({:global,a},{:join_network,b})
-    if (n>0) do
-      Process.send_after(self(),{:join_node,n-1},1000*(non-n))
+    cond do
+      n<non-2 -> [a,b,c]=Enum.slice(nodes,n,3)
+                 #IO.inspect([a,b,c])
+                 GenServer.cast({:global,b},{:join_net,a,c,nodes,n+1})
+                 Process.send_after(self(),{:join_node,n+1},n)
+      n == non-2 -> [a,b]=Enum.slice(nodes,n,2)
+                    #IO.inspect([a,b])
+           GenServer.cast({:global,b},{:join_net,a,List.first(nodes),nodes,n+1})
+      true ->  {:noreply, {non,nom,noh,dcount,nodes}}
     end
     {:noreply, {non,nom,noh,dcount,nodes}}
   end
 
-  def handle_cast({:save_hops,{m,s,f,hops}},{non,nom,noh,dcount,nodes}) do
+  def handle_cast({:save_hops,{_m,_s,_f,hops}},{non,nom,noh,dcount,nodes}) do
     noh = noh+hops
     dcount = dcount+1
-    IO.puts("save_hop")
-    IO.inspect({m,s,f,hops})
+    #IO.puts("save_hop")
+    #IO.inspect({m,s,f,hops})
     if(dcount==nom*non) do
       IO.puts("Average Hop Count")
       IO.inspect(noh/dcount)
-    #  System.halt(0)
+      System.halt(0)
     end
     {:noreply, {non,nom,noh,dcount,nodes}}
   end
+
+  def handle_cast(:start_hop,{non,nom,noh,dcount,nodes}) do
+    Process.send_after(self(),{:start_query},0)
+    {:noreply, {non,nom,noh,dcount,nodes}}
+  end
+
 
 
 
@@ -94,7 +106,7 @@ defmodule ChordProtocol.NetworkSimulator do
   end
 
   def start_node(_non,nodes) do
-    nodes
+    Enum.sort(nodes)
   end
 
 end
