@@ -1,21 +1,17 @@
 # ChordProtocol
 
-**TODO: Add description**
+## Description
+A simulation of chord protocol for dristibuted system using actor model in Elixir.
+The peer to peer to network is stabilised as nodes continue to join and stabilize.
+Maximum number of nodes tried - 1000
 
-## Installation
+### Project Execution – 
+mix run --no-halt proj3.exs 100 20
 
-If [available in Hex](https://hex.pm/docs/publish), the package can be installed
-by adding `chord_protocol` to your list of dependencies in `mix.exs`:
+### usage:  mix run --no-halt proj3.exs <n> <m>
+Where 'n' is the number of peers to be created in the peer to peersystem and 'm' the number of requests each peer has to make.  When all peers performed that many requests, the program can exit.  Each peer should send a request/second.
 
-```elixir
-def deps do
-  [
-    {:chord_protocol, "~> 0.1.0"}
-  ]
-end
-```
+### Output:
+Print the average number of hops (node connections) that have to be traversed to deliever a message.
 
-Documentation can be generated with [ExDoc](https://github.com/elixir-lang/ex_doc)
-and published on [HexDocs](https://hexdocs.pm). Once published, the docs can
-be found at [https://hexdocs.pm/chord_protocol](https://hexdocs.pm/chord_protocol).
 

@@ -22,6 +22,7 @@ defmodule ChordProtocol.NetworkSimulator do
     nodes = start_node(non-2,nodes)
     #Process.send_after(self(),{:start_node,non-2},5000)
     GenServer.cast({:global,Enum.at(nodes,0)},{:join_net,List.last(nodes),Enum.at(nodes,1),nodes,0})
+    GenServer.cast(FailureSimulator,{:save,nodes})
     IO.puts("Building Network...Please Wait")
     Process.send_after(self(),{:join_node,0},2000)
     #Process.send_after(self(),{:start_query},2500+non)
@@ -34,7 +35,7 @@ defmodule ChordProtocol.NetworkSimulator do
   def handle_info({:start_query},{non,nom,noh,dcount,nodes}) do
     #IO.inspect(length(nodes))
     1..nom |> Enum.each(fn x ->
-      Process.send_after(self(),{:start_msg,x},5000)
+      Process.send_after(self(),{:start_msg,x},2000)
     end)
     {:noreply, {non,nom,noh,dcount,nodes}}
   end
@@ -43,7 +44,7 @@ defmodule ChordProtocol.NetworkSimulator do
     msg = "message" <> Integer.to_string(x)
     <<message::big-unsigned-integer-size(160)>> = :crypto.hash(:sha,msg)
     nodes |> Enum.with_index |> Enum.each(fn {c,i} ->
-      Process.send_after(self(),{:find_key,message,c},100*i)
+      Process.send_after(self(),{:find_key,message,c},100)
       #GenServer.call({:global,c},{:find_key,message,0},@timeo)
       #IO.inspect(c)
     end)
@@ -51,7 +52,7 @@ defmodule ChordProtocol.NetworkSimulator do
   end
 
   def handle_info({:find_key,message,c},{non,nom,noh,dcount,nodes}) do
-    GenServer.call({:global,c},{:find_key,message,0,c},@timeo)
+    GenServer.cast({:global,c},{:find_msg,message,0,c})
     {:noreply, {non,nom,noh,dcount,nodes}}
   end
 

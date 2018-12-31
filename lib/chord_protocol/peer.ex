@@ -27,10 +27,10 @@ defmodule ChordProtocol.Peer do
 
 
     #Process.send_after(self(), {:join,dnode}, 10)
-    {:ok, {finger, identifier, nil}}
+    {:ok, {finger, identifier, nil,[]}}
   end
 
-  def handle_info({:join,dnode},{finger, identifier, _pre}) do
+  def handle_info({:join,dnode},{finger, identifier, _pre,slist}) do
     #IO.puts("INIT ")
     #IO.inspect(identifier)
     {p,newfinger} = if (dnode) do
@@ -71,16 +71,20 @@ defmodule ChordProtocol.Peer do
     stabilize(60000*Enum.random(1..5))
     fix_fingers(159,60000)
     #check_finger(60000*2)
-    { :noreply, {newfinger, identifier, p} }
+    { :noreply, {newfinger, identifier, p,slist} }
   end
 
 
-  def handle_info(:stabilize,{finger, identifier, pre}) do
+  def handle_info(:stabilize,{finger, identifier, pre,slist}) do
     [{start,peer}|rest] = finger
     x = if peer==identifier do
       pre
     else
-      GenServer.call(globalcall(peer),:get_pre,@timeo)
+      try do
+        GenServer.call(globalcall(peer),:get_pre,@timeo)
+      catch
+        :exit, _ -> GenServer.call(globalcall(Enum.at(slist,1)),:get_pre,@timeo)
+      end
     end
     peer = if (peer==identifier || between(x,identifier,peer)) && peer != x do
       #IO.puts("set_suc")
@@ -95,10 +99,10 @@ defmodule ChordProtocol.Peer do
     #IO.inspect({peer,identifier})
     end
     stabilize(2000*Enum.random(1..5))
-    { :noreply, {[{start,peer}|rest], identifier, pre} }
+    { :noreply, {[{start,peer}|rest], identifier, pre,slist} }
   end
 
-  def handle_info({:fix_fingers,n},{finger, identifier, pre}) do
+  def handle_info({:fix_fingers,n},{finger, identifier, pre,slist}) do
     {s,_pr} = Enum.at(finger,n)
     {_start,suc} = List.first(finger)
     peer = if betweeno(s,identifier,suc) do
@@ -108,7 +112,11 @@ defmodule ChordProtocol.Peer do
       suc = if ndash==identifier do
         suc
       else
-        GenServer.call(globalcall(ndash),{:find_suc,s},@timeo)
+        try do
+          GenServer.call(globalcall(ndash),{:find_suc,s},@timeo)
+        catch
+          :exit, _ -> GenServer.call(globalcall(Enum.at(slist,1)),{:find_suc,s},@timeo)
+        end
       end
       suc
     end
@@ -120,37 +128,37 @@ defmodule ChordProtocol.Peer do
       n
     end
     fix_fingers(n,1000)
-    { :noreply, {newfinger, identifier, pre} }
+    { :noreply, {newfinger, identifier, pre,slist} }
   end
 
-  def handle_info(:check_finger,{finger, identifier, pre}) do
+  def handle_info(:check_finger,{finger, identifier, pre,slist}) do
     {_start,peer} = List.first(finger)
     IO.puts("Finger TABLE")
     IO.inspect({identifier,pre,peer})
     IO.inspect(Enum.take(finger,-5))
     #IO.inspect(finger)
     check_finger(60000)
-    { :noreply, {finger, identifier, pre} }
+    { :noreply, {finger, identifier, pre,slist} }
   end
 
-  def handle_info(:timeout,{finger,identifier,pre}) do
+  def handle_info(:timeout,{finger,identifier,pre,slist}) do
     IO.puts("Timeout")
     IO.inspect(identifier)
-    { :noreply, {finger, identifier, pre} }
+    { :noreply, {finger, identifier, pre,slist} }
   end
 
-  def handle_call(:get_pre,_from,{finger,identifier,pre}) do
+  def handle_call(:get_pre,_from,{finger,identifier,pre,slist}) do
     #check_finger()
-    { :reply, pre,{finger,identifier,pre} }
+    { :reply, pre,{finger,identifier,pre,slist} }
   end
 
-  def handle_call(:get_suc,_from,{finger,identifier,pre}) do
+  def handle_call(:get_suc,_from,{finger,identifier,pre,slist}) do
     {_start,peer} = List.first(finger)
-    { :reply,peer,{finger,identifier,pre} }
+    { :reply,peer,{finger,identifier,pre,slist} }
   end
 
 
-  def handle_call({:find_suc,id},_from,{finger,identifier,pre}) do
+  def handle_call({:find_suc,id},_from,{finger,identifier,pre,slist}) do
     #IO.puts("test1")
     #IO.inspect(List.first(finger))
     {_start,suc} = List.first(finger)
@@ -161,21 +169,25 @@ defmodule ChordProtocol.Peer do
       suc = if ndash==identifier do
         suc
       else
-        GenServer.call(globalcall(ndash),{:find_suc,id},@timeo)
+        try do
+          GenServer.call(globalcall(ndash),{:find_suc,id},@timeo)
+        catch
+          :exit, _ -> GenServer.call(globalcall(Enum.at(slist,1)),{:find_suc,id},@timeo)
+        end
       end
       suc
     end
-    { :reply, successor,{finger,identifier,pre} }
+    { :reply, successor,{finger,identifier,pre,slist} }
   end
 
-  def handle_call({:find_pre,id},_from,{finger,identifier,pre}) do
+  def handle_call({:find_pre,id},_from,{finger,identifier,pre,slist}) do
     #IO.puts("test1")
     #IO.inspect(List.first(finger))
     p=find_predecessor(id,{finger,identifier,pre})
-    { :reply, p,{finger,identifier,pre} }
+    { :reply, p,{finger,identifier,pre,slist} }
   end
 
-  def handle_call({:find_key,id,hop,c},_from,{finger,identifier,pre}) do
+  def handle_call({:find_key,id,hop,c},_from,{finger,identifier,pre,slist}) do
     #IO.puts("test1")
     #IO.inspect(List.first(finger))
     {_start,suc} = List.first(finger)
@@ -186,18 +198,22 @@ defmodule ChordProtocol.Peer do
       {suc,hop} = if ndash==identifier do
         {suc,hop}
         else
-           GenServer.call(globalcall(ndash),{:find_key,id,hop+1,c},@timeo)
+          try do
+            GenServer.call(globalcall(ndash),{:find_key,id,hop+1,c},@timeo)
+          catch
+            :exit, _ ->  GenServer.call(globalcall(Enum.at(slist,1)),{:find_key,id,hop+1,c},@timeo)
+          end
         end
       {suc,hop}
     end
       if(c==identifier) do
       GenServer.cast(NetworkSimulator,{:save_hops,{id,c,identifier,h}})
       end
-      { :reply, {successor,h},{finger,identifier,pre} }
+      { :reply, {successor,h},{finger,identifier,pre,slist} }
 
   end
 
-  def handle_call({:set_pre,peer},_from,{finger,identifier,_pre}) do
+  def handle_call({:set_pre,peer},_from,{finger,identifier,_pre,slist}) do
     #IO.inspect("set pre")
     #newpre = if (pre==nil or between(peer,pre,identifier)) do
     #  peer
@@ -205,10 +221,10 @@ defmodule ChordProtocol.Peer do
     #  pre
     #  end
     #IO.inspect({identifier,peer})
-    { :reply,nil,{finger,identifier,peer} }
+    { :reply,nil,{finger,identifier,peer,slist} }
   end
 
-  def handle_call({:set_succ,peer},_from,{finger,identifier,pre}) do
+  def handle_call({:set_succ,peer},_from,{finger,identifier,pre,slist}) do
     {start,suc} = List.first(finger)
     successor = if betweeno(peer,identifier,suc) do
       peer
@@ -216,10 +232,14 @@ defmodule ChordProtocol.Peer do
       suc
     end
     newfinger = List.replace_at(finger,0,{start,successor})
-    { :reply, nil,{newfinger,identifier,pre} }
+    { :reply, nil,{newfinger,identifier,pre,slist} }
   end
 
-  def handle_cast({:set_prec,peer},{finger,identifier,pre}) do
+  def handle_cast(:die,state) do
+    {:stop, :normal, nil}
+  end
+
+  def handle_cast({:set_prec,peer},{finger,identifier,pre,slist}) do
     #IO.inspect("set pre")
     #if(peer != pre) do
      # IO.puts("set_pre")
@@ -227,7 +247,7 @@ defmodule ChordProtocol.Peer do
    # end
     newpre = cond do
       pre == nil -> peer
-      between(peer,pre,identifier) -> GenServer.call(globalcall(pre),{:set_succ,peer})
+      between(peer,pre,identifier) -> #GenServer.call(globalcall(pre),{:set_succ,peer})
                                       peer
       true -> pre
     end
@@ -239,10 +259,10 @@ defmodule ChordProtocol.Peer do
     #  pre
     #  end
     #IO.inspect({identifier,newpre})
-    { :noreply,{finger,identifier,newpre} }
+    { :noreply,{finger,identifier,newpre,slist} }
   end
 
-  def handle_cast({:update_finger,s,i},{finger,identifier,pre}) do
+  def handle_cast({:update_finger,s,i},{finger,identifier,pre,slist}) do
     {start,peer} = Enum.at(finger,i)
     npeer = if (between(s,identifier,peer)) do
       if identifier != pre do
@@ -257,20 +277,24 @@ defmodule ChordProtocol.Peer do
       else
       finger
     end
-    { :noreply,{newfinger,identifier,pre} }
+    { :noreply,{newfinger,identifier,pre,slist} }
   end
 
-  def handle_cast({:join_network,dnode},{finger,identifier,pre}) do
+  def handle_cast({:join_network,dnode},{finger,identifier,pre,slist}) do
     Process.send_after(self(), {:join,dnode}, 10)
-    { :noreply,{finger,identifier,pre} }
+    { :noreply,{finger,identifier,pre,slist} }
   end
 
-  def handle_cast({:join_net,p,s,nodes,_i},{finger,identifier,_pre}) do
+  def handle_cast({:join_net,p,s,nodes,i},{finger,identifier,_pre,slist}) do
 
       [{fstart,_} | rest] = finger
 
       peer = s
       npre =  p
+      size = round(:math.log2(length(nodes)))
+      slist = Enum.slice(nodes,i+1,size)
+      n=size-length(slist)
+      slist = slist ++ Enum.slice(nodes,0,n)
 
       nf=[{fstart,peer}|rest] |> Enum.scan(fn (a,b) ->
         {cstart,_cpeer} = a
@@ -295,12 +319,33 @@ defmodule ChordProtocol.Peer do
     stabilize(60000*Enum.random(1..5))
     fix_fingers(159,60000)
     GenServer.cast(FailureSimulator,:done)
-    { :noreply,{nf,identifier,npre} }
+    { :noreply,{nf,identifier,npre,slist} }
   end
-  #def handle_cast({:find_key,message},{finger,identifier,pre}) do
-   # Process.send_after({})
-   # { :noreply,{finger,identifier,pre} }
-  #end
+
+  def handle_cast({:find_msg,id,hop,c},{finger,identifier,pre,slist}) do
+    {_start,suc} = List.first(finger)
+    {successor,h} = if betweeno(id,identifier,suc) do
+      {suc,hop}
+    else
+      ndash=closest_prec_node(id,{finger,identifier,pre})
+      {suc,hop} = if ndash==identifier do
+        {suc,hop}
+      else
+        try do
+          GenServer.call(globalcall(ndash),{:find_key,id,hop+1,c},@timeo)
+        catch
+          :exit, _ ->  GenServer.call(globalcall(Enum.at(slist,1)),{:find_key,id,hop+1,c},@timeo)
+        end
+
+
+      end
+      {suc,hop}
+    end
+    if(c==identifier) do
+      GenServer.cast(NetworkSimulator,{:save_hops,{id,c,identifier,h}})
+    end
+    { :noreply,{finger,identifier,pre,slist} }
+  end
 
 
 
